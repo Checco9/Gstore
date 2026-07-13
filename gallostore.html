@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GalloStore</title>
+<meta name="theme-color" content="#0b1120">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0b1120;
+    --bg-2:#121a2e;
+    --panel:rgba(255,255,255,0.055);
+    --panel-border:rgba(255,255,255,0.10);
+    --text:#e7eaf2;
+    --text-dim:#8b93a7;
+    --accent:#8b6bf2;
+    --accent-game:#8b6bf2;
+    --accent-app:#22c9b0;
+    --accent-news:#f2a341;
+    --accent-user:#f2618f;
+    --radius:16px;
+    --font-size-base:16px;
+    --motion:1;
+  }
+  body.theme-light{
+    --bg:#eef0f6;
+    --bg-2:#e3e7f2;
+    --panel:rgba(20,24,38,0.05);
+    --panel-border:rgba(20,24,38,0.10);
+    --text:#171a24;
+    --text-dim:#5a6072;
+  }
+  body.contrast-high{
+    --panel:rgba(255,255,255,0.14);
+    --panel-border:rgba(255,255,255,0.35);
+    --text-dim:#c7cbdb;
+  }
+  body.contrast-high.theme-light{
+    --panel:rgba(20,24,38,0.10);
+    --panel-border:rgba(20,24,38,0.35);
+    --text-dim:#3a3f4d;
+  }
+  *{box-sizing:border-box;}
+  html{font-size:var(--font-size-base);}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 15% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 55%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+    transition:background .4s ease, color .3s ease;
+    overflow-x:hidden;
+  }
+  @media (prefers-reduced-motion: reduce){
+    :root{ --motion:0; }
+  }
+  *{
+    scroll-behavior:smooth;
+  }
+  button, input{ font-family:inherit; }
+  button:focus-visible, input:focus-visible, [tabindex]:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:3px;
+  }
+  a{color:inherit;}
+
+  .glow{
+    position:fixed;
+    left:0; right:0; bottom:-10vh;
+    height:26vh;
+    background:var(--accent);
+    filter:blur(90px);
+    opacity:.35;
+    pointer-events:none;
+    transition:background .5s ease;
+    z-index:0;
+  }
+
+  .app-shell{
+    position:relative;
+    z-index:1;
+    display:flex;
+    min-height:100vh;
+  }
+
+  /* ---------- RAIL / NAV ---------- */
+  .rail{
+    width:76px;
+    flex-shrink:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+    padding:20px 0;
+    position:sticky;
+    top:0;
+    height:100vh;
+  }
+  .brand{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:.68rem;
+    letter-spacing:.12em;
+    color:var(--text-dim);
+    writing-mode:vertical-rl;
+    margin-bottom:24px;
+    user-select:none;
+  }
+  .nav-btn{
+    width:48px;
+    height:48px;
+    border-radius:14px;
+    border:1px solid transparent;
+    background:transparent;
+    color:var(--text-dim);
+    font-size:1.05rem;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:background .2s ease, color .2s ease, transform .15s ease;
+  }
+  .nav-btn:hover{ transform:translateY(-1px); color:var(--text); }
+  .nav-btn[aria-current="true"]{
+    background:var(--panel);
+    border-color:var(--panel-border);
+    color:var(--nav-accent, var(--text));
+  }
+  .nav-btn.game{ --nav-accent:var(--accent-game); }
+  .nav-btn.app{ --nav-accent:var(--accent-app); }
+  .nav-btn.news{ --nav-accent:var(--accent-news); }
+  .nav-btn.user{ --nav-accent:var(--accent-user); }
+  .nav-spacer{ flex:1; }
+
+  /* ---------- MAIN ---------- */
+  .main{
+    flex:1;
+    min-width:0;
+    padding:22px 28px 120px;
+  }
+  .topbar{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    margin-bottom:28px;
+  }
+  .search{
+    flex:1;
+    max-width:480px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:11px 16px;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:12px;
+    backdrop-filter:blur(14px);
+    color:var(--text-dim);
+  }
+  .search i{ font-size:.85rem; }
+  .search input{
+    flex:1;
+    background:none;
+    border:none;
+    color:var(--text);
+    font-size:.9rem;
+  }
+  .search input::placeholder{ color:var(--text-dim); }
+  .search input:focus{ outline:none; }
+
+  .view{ display:none; animation:fadeIn .35s ease; }
+  .view.active{ display:block; }
+  @keyframes fadeIn{
+    from{ opacity:0; transform:translateY(calc(6px * var(--motion))); }
+    to{ opacity:1; transform:none; }
+  }
+
+  .hero h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:clamp(1.6rem, 3vw, 2.2rem);
+    margin:4px 0 6px;
+  }
+  .hero p{
+    color:var(--text-dim);
+    margin:0 0 28px;
+    max-width:52ch;
+  }
+
+  .cat-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:16px;
+  }
+  .cat-card{
+    grid-column:span 1;
+    padding:20px;
+    border-radius:var(--radius);
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    backdrop-filter:blur(14px);
+    cursor:pointer;
+    text-align:left;
+    color:var(--text);
+    transition:transform .2s ease, border-color .2s ease;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    min-height:150px;
+  }
+  .cat-card:hover{ transform:translateY(-3px); border-color:var(--card-accent); }
+  .cat-card i{ font-size:1.3rem; color:var(--card-accent); }
+  .cat-card h3{ margin:0; font-family:'Space Grotesk', sans-serif; font-size:1.05rem; }
+  .cat-card span{ color:var(--text-dim); font-size:.83rem; }
+  .cat-card.game{ --card-accent:var(--accent-game); }
+  .cat-card.app{ --card-accent:var(--accent-app); }
+  .cat-card.news{ --card-accent:var(--accent-news); }
+
+  .hub-header{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-bottom:22px;
+  }
+  .back-btn{
+    width:38px; height:38px;
+    border-radius:10px;
+    border:1px solid var(--panel-border);
+    background:var(--panel);
+    color:var(--text);
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .hub-header h2{
+    font-family:'Space Grotesk', sans-serif;
+    margin:0;
+    font-size:1.3rem;
+  }
+
+  .card-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));
+    gap:16px;
+  }
+  .item-card{
+    padding:18px;
+    border-radius:var(--radius);
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    backdrop-filter:blur(14px);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .item-tag{
+    align-self:flex-start;
+    font-family:'JetBrains Mono', monospace;
+    font-size:.68rem;
+    letter-spacing:.05em;
+    color:var(--tag-accent, var(--text-dim));
+    background:color-mix(in srgb, var(--tag-accent, var(--text-dim)) 16%, transparent);
+    padding:3px 8px;
+    border-radius:999px;
+  }
+  .item-card h4{ margin:2px 0 0; font-family:'Space Grotesk', sans-serif; font-size:1rem; }
+  .item-card p{ margin:0; color:var(--text-dim); font-size:.85rem; line-height:1.5; }
+  .item-card.game .item-tag{ --tag-accent:var(--accent-game); }
+  .item-card.app .item-tag{ --tag-accent:var(--accent-app); }
+  .item-card.news .item-tag{ --tag-accent:var(--accent-news); }
+
+  /* ---------- USER VIEW ---------- */
+  .user-layout{
+    display:grid;
+    grid-template-columns:260px 1fr;
+    gap:20px;
+    align-items:start;
+  }
+  .profile-card, .settings-card{
+    padding:22px;
+    border-radius:var(--radius);
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    backdrop-filter:blur(14px);
+  }
+  .avatar{
+    width:84px; height:84px;
+    border-radius:50%;
+    background:linear-gradient(135deg, var(--accent-user), var(--accent-game));
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk', sans-serif;
+    font-size:1.6rem;
+    font-weight:700;
+    color:#fff;
+    margin-bottom:14px;
+  }
+  .avatar-upload{
+    font-size:.75rem;
+    color:var(--text-dim);
+    margin-top:8px;
+    display:block;
+  }
+  .avatar-upload input{ display:block; margin-top:6px; font-size:.75rem; color:var(--text-dim); }
+  .profile-card h3{ margin:0 0 2px; font-family:'Space Grotesk', sans-serif; }
+  .profile-card p{ margin:0 0 18px; color:var(--text-dim); font-size:.85rem; }
+  .menu-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; }
+  .menu-list button{
+    width:100%;
+    text-align:left;
+    background:none;
+    border:none;
+    color:var(--text);
+    padding:10px 8px;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:.9rem;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .menu-list button:hover{ background:var(--panel-border); }
+  .menu-list button.danger{ color:var(--accent-user); }
+
+  .settings-card h3{ margin-top:0; font-family:'Space Grotesk', sans-serif; font-size:1.05rem; }
+  .setting-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:12px 0;
+    border-bottom:1px solid var(--panel-border);
+    gap:16px;
+  }
+  .setting-row:last-child{ border-bottom:none; }
+  .setting-row .label{ font-size:.88rem; }
+  .setting-row .desc{ font-size:.76rem; color:var(--text-dim); margin-top:2px; }
+  .toggle{
+    width:42px; height:24px;
+    border-radius:999px;
+    background:var(--panel-border);
+    border:none;
+    position:relative;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .toggle::after{
+    content:'';
+    position:absolute;
+    top:3px; left:3px;
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--text);
+    transition:transform .2s ease;
+  }
+  .toggle[aria-pressed="true"]{ background:var(--accent); }
+  .toggle[aria-pressed="true"]::after{ transform:translateX(18px); background:#fff; }
+  .font-stepper{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .font-stepper button{
+    width:30px; height:30px;
+    border-radius:8px;
+    border:1px solid var(--panel-border);
+    background:transparent;
+    color:var(--text);
+    cursor:pointer;
+    font-family:'Space Grotesk', sans-serif;
+  }
+
+  /* ---------- LOGIN / LIBRARY ---------- */
+  .field-label{ display:block; font-size:.78rem; color:var(--text-dim); margin-bottom:6px; }
+  .text-input{
+    width:100%;
+    padding:9px 12px;
+    border-radius:10px;
+    border:1px solid var(--panel-border);
+    background:var(--bg);
+    color:var(--text);
+    font-size:.88rem;
+    margin-bottom:10px;
+  }
+  .primary-btn{
+    width:100%;
+    padding:10px 12px;
+    border-radius:10px;
+    border:none;
+    background:var(--accent);
+    color:#fff;
+    font-weight:600;
+    font-size:.88rem;
+    cursor:pointer;
+  }
+  .ghost-btn{
+    padding:8px 12px;
+    border-radius:10px;
+    border:1px solid var(--panel-border);
+    background:transparent;
+    color:var(--text);
+    font-size:.82rem;
+    cursor:pointer;
+  }
+  .stack-gap{ display:flex; flex-direction:column; gap:14px; }
+  .library-card h3{ margin-top:0; font-family:'Space Grotesk', sans-serif; font-size:1.05rem; }
+  .library-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:9px 0;
+    border-bottom:1px solid var(--panel-border);
+    font-size:.85rem;
+    gap:10px;
+  }
+  .library-row:last-child{ border-bottom:none; }
+  .empty-hint{ color:var(--text-dim); font-size:.83rem; }
+  .download-btn{
+    margin-top:auto;
+    align-self:flex-start;
+    padding:7px 13px;
+    border-radius:999px;
+    border:1px solid var(--panel-border);
+    background:transparent;
+    color:var(--text);
+    font-size:.78rem;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .download-btn.owned{ background:var(--accent-app); border-color:var(--accent-app); color:#fff; }
+  .remove-link{ background:none; border:none; color:var(--accent-user); font-size:.78rem; cursor:pointer; }
+
+  .dev-trigger{
+    width:38px; height:38px;
+    border-radius:10px;
+    border:1px solid var(--panel-border);
+    background:var(--panel);
+    color:var(--text-dim);
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .dev-trigger:hover{ color:var(--text); }
+
+  .modal-overlay{
+    position:fixed; inset:0;
+    background:rgba(5,7,14,0.6);
+    backdrop-filter:blur(4px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:20;
+    padding:20px;
+  }
+  .modal-overlay[hidden]{ display:none; }
+  .modal-box{
+    width:100%;
+    max-width:460px;
+    max-height:86vh;
+    overflow-y:auto;
+    background:var(--bg-2);
+    border:1px solid var(--panel-border);
+    border-radius:var(--radius);
+    padding:22px;
+  }
+  .modal-box h3{ margin-top:0; font-family:'Space Grotesk', sans-serif; }
+  .modal-close{
+    float:right;
+    background:none;
+    border:none;
+    color:var(--text-dim);
+    font-size:1rem;
+    cursor:pointer;
+  }
+  .admin-list-row{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px 0;
+    border-bottom:1px solid var(--panel-border);
+  }
+  .admin-list-row:last-child{ border-bottom:none; }
+  .admin-list-row strong{ font-size:.88rem; }
+  .admin-list-row p{ margin:2px 0 0; font-size:.78rem; color:var(--text-dim); }
+  textarea.text-input{ resize:vertical; min-height:64px; font-family:inherit; }
+
+  /* ---------- MOBILE ---------- */
+  .mobile-toggle{ display:none; }
+  @media (max-width: 760px){
+    .rail{
+      position:fixed;
+      bottom:0; left:0; right:0;
+      top:auto;
+      height:64px;
+      width:100%;
+      flex-direction:row;
+      justify-content:space-around;
+      background:var(--panel);
+      border-top:1px solid var(--panel-border);
+      backdrop-filter:blur(16px);
+      padding:0;
+      z-index:5;
+    }
+    .brand{ display:none; }
+    .nav-spacer{ display:none; }
+    .main{ padding:16px 16px 100px; }
+    .cat-grid{ grid-template-columns:1fr; }
+    .user-layout{ grid-template-columns:1fr; }
+    .search{ max-width:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="glow" id="glow"></div>
+
+<div class="app-shell">
+  <nav class="rail" aria-label="Navigazione principale">
+    <span class="brand">GALLOSTORE</span>
+    <button class="nav-btn" data-view="home" aria-current="true" title="Home" aria-label="Home"><i class="fa-solid fa-house"></i></button>
+    <button class="nav-btn game" data-view="game" title="Giochi" aria-label="Giochi"><i class="fa-solid fa-gamepad"></i></button>
+    <button class="nav-btn app" data-view="app" title="App" aria-label="App"><i class="fa-solid fa-mobile-screen-button"></i></button>
+    <button class="nav-btn news" data-view="news" title="News" aria-label="News"><i class="fa-solid fa-newspaper"></i></button>
+    <div class="nav-spacer"></div>
+    <button class="nav-btn user" data-view="user" title="Profilo" aria-label="Profilo"><i class="fa-solid fa-user"></i></button>
+  </nav>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" placeholder="Cerca giochi, app, news…" aria-label="Cerca">
+      </div>
+      <button class="dev-trigger" id="devTrigger" title="Modalità sviluppatore" aria-label="Modalità sviluppatore"><i class="fa-solid fa-code"></i></button>
+    </div>
+
+    <!-- HOME -->
+    <section class="view active" id="view-home">
+      <div class="hero">
+        <h1>Ciao 👋 cosa scopriamo oggi?</h1>
+        <p>Il tuo hub personale per giochi, app e novità. Scegli una sezione per iniziare.</p>
+      </div>
+      <div class="cat-grid">
+        <button class="cat-card game" data-view="game">
+          <i class="fa-solid fa-gamepad"></i>
+          <h3>Giochi</h3>
+          <span id="countGame">Carico…</span>
+        </button>
+        <button class="cat-card app" data-view="app">
+          <i class="fa-solid fa-mobile-screen-button"></i>
+          <h3>App</h3>
+          <span id="countApp">Carico…</span>
+        </button>
+        <button class="cat-card news" data-view="news">
+          <i class="fa-solid fa-newspaper"></i>
+          <h3>News</h3>
+          <span id="countNews">Carico…</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- GAME -->
+    <section class="view" id="view-game">
+      <div class="hub-header">
+        <button class="back-btn" data-view="home" aria-label="Torna alla home"><i class="fa-solid fa-arrow-left"></i></button>
+        <h2>Giochi</h2>
+      </div>
+      <div class="card-grid" id="itemList-game">
+        <p class="empty-hint">Carico…</p>
+      </div>
+    </section>
+
+    <!-- APP -->
+    <section class="view" id="view-app">
+      <div class="hub-header">
+        <button class="back-btn" data-view="home" aria-label="Torna alla home"><i class="fa-solid fa-arrow-left"></i></button>
+        <h2>App</h2>
+      </div>
+      <div class="card-grid" id="itemList-app">
+        <p class="empty-hint">Carico…</p>
+      </div>
+    </section>
+
+    <!-- NEWS -->
+    <section class="view" id="view-news">
+      <div class="hub-header">
+        <button class="back-btn" data-view="home" aria-label="Torna alla home"><i class="fa-solid fa-arrow-left"></i></button>
+        <h2>News</h2>
+      </div>
+      <div class="card-grid" id="itemList-news">
+        <p class="empty-hint">Carico…</p>
+      </div>
+    </section>
+
+    <!-- USER -->
+    <section class="view" id="view-user">
+      <div class="hub-header">
+        <button class="back-btn" data-view="home" aria-label="Torna alla home"><i class="fa-solid fa-arrow-left"></i></button>
+        <h2>Profilo</h2>
+      </div>
+      <div class="user-layout">
+        <div class="profile-card">
+          <div id="loginGate">
+            <div class="avatar">?</div>
+            <h3>Accedi</h3>
+            <p>Crea un account vero per salvare la tua libreria in modo sicuro.</p>
+            <label class="field-label" for="emailInput">Email</label>
+            <input class="text-input" id="emailInput" type="email" placeholder="tuo@email.it">
+            <label class="field-label" for="passwordInput">Password</label>
+            <input class="text-input" id="passwordInput" type="password" placeholder="Almeno 6 caratteri">
+            <button class="primary-btn" id="loginBtn">Accedi</button>
+            <button class="ghost-btn" id="signupBtn" style="width:100%;margin-top:8px;">Crea un nuovo account</button>
+            <p class="empty-hint" id="authError" style="color:var(--accent-user); display:none; margin-top:8px;"></p>
+          </div>
+          <div id="profileLogged" hidden>
+            <div class="avatar" id="avatarInitial">F</div>
+            <h3 id="profileName">—</h3>
+            <p id="profileEmail">—</p>
+            <ul class="menu-list">
+              <li><button id="btn-access"><i class="fa-solid fa-universal-access"></i> Accessibilità</button></li>
+              <li><button id="btn-logout" class="danger"><i class="fa-solid fa-right-from-bracket"></i> Esci</button></li>
+            </ul>
+            <label class="avatar-upload">Cambia immagine profilo (anteprima locale)
+              <input type="file" id="fileUpload" accept="image/*">
+            </label>
+          </div>
+        </div>
+
+        <div class="stack-gap">
+          <div class="library-card settings-card">
+            <h3>La mia libreria</h3>
+            <div id="libraryList">
+              <p class="empty-hint">Accedi per vedere i giochi che hai scaricato.</p>
+            </div>
+          </div>
+
+          <div class="settings-card" id="accessPanel" hidden>
+            <h3>Accessibilità</h3>
+            <div class="setting-row">
+              <div>
+                <div class="label">Dimensione testo</div>
+                <div class="desc">Regola la leggibilità dei contenuti</div>
+              </div>
+              <div class="font-stepper">
+                <button id="fontMinus" aria-label="Riduci testo">A−</button>
+                <button id="fontPlus" aria-label="Aumenta testo">A+</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="label">Contrasto elevato</div>
+                <div class="desc">Bordi e testo secondario più marcati</div>
+              </div>
+              <button class="toggle" id="toggleContrast" aria-pressed="false" aria-label="Attiva contrasto elevato"></button>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="label">Riduci le animazioni</div>
+                <div class="desc">Disattiva transizioni e movimento</div>
+              </div>
+              <button class="toggle" id="toggleMotion" aria-pressed="false" aria-label="Riduci le animazioni"></button>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="label">Tema chiaro</div>
+                <div class="desc">Passa da tema scuro a chiaro</div>
+              </div>
+              <button class="toggle" id="toggleTheme" aria-pressed="false" aria-label="Attiva tema chiaro"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ADMIN PANEL MODAL -->
+<div class="modal-overlay" id="adminModal" hidden>
+  <div class="modal-box">
+    <button class="modal-close" id="closeAdmin" aria-label="Chiudi">✕</button>
+    <h3>Gestisci catalogo giochi</h3>
+    <label class="field-label" for="gameTitleInput">Titolo</label>
+    <input class="text-input" id="gameTitleInput" placeholder="es. Nebula Drift">
+    <label class="field-label" for="gameCategoryInput">Sezione di destinazione</label>
+    <select class="text-input" id="gameCategoryInput">
+      <option value="game">Giochi</option>
+      <option value="app">App</option>
+      <option value="news">News</option>
+    </select>
+    <label class="field-label" for="gameTagInput">Tag / categoria</label>
+    <input class="text-input" id="gameTagInput" placeholder="es. AVVENTURA">
+    <label class="field-label" for="gameDescInput">Descrizione</label>
+    <textarea class="text-input" id="gameDescInput" placeholder="Breve descrizione del gioco"></textarea>
+    <label class="field-label" for="gameFileInput">File del gioco (opzionale — .zip, .exe, ecc.)</label>
+    <input class="text-input" type="file" id="gameFileInput">
+    <button class="primary-btn" id="addGameBtn">Aggiungi gioco</button>
+    <h3 style="margin-top:22px;">Giochi nel catalogo</h3>
+    <div id="adminGamesList"><p class="empty-hint">Carico…</p></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ============================================================
+  // CONFIGURAZIONE — incolla qui i tuoi dati da Supabase
+  // Dashboard > Project Settings > API
+  // ============================================================
+  const SUPABASE_URL = 'https://jctwxvcjptzdmutrhyug.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_r3j2x5aMzOlqf-ZftRPAXA_As_CWjXL';
+
+  if(SUPABASE_URL.startsWith('INSERISCI')){
+    document.querySelector('.main').insertAdjacentHTML('afterbegin',
+      '<div class="settings-card" style="border-color:var(--accent-user);margin-bottom:20px;">' +
+      '<strong>Configurazione mancante:</strong> apri il file HTML e inserisci SUPABASE_URL e SUPABASE_ANON_KEY nello script (vedi le istruzioni ricevute in chat).</div>');
+  }
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const views = document.querySelectorAll('.view');
+  const glow = document.getElementById('glow');
+  const accentMap = { home:'var(--accent)', game:'var(--accent-game)', app:'var(--accent-app)', news:'var(--accent-news)', user:'var(--accent-user)' };
+
+  function goTo(name){
+    views.forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+    document.querySelectorAll('.nav-btn[data-view]').forEach(b => {
+      b.setAttribute('aria-current', b.dataset.view === name ? 'true' : 'false');
+    });
+    glow.style.background = accentMap[name] || accentMap.home;
+    document.getElementById('accessPanel').hidden = true;
+  }
+
+  document.querySelectorAll('[data-view]').forEach(el => {
+    el.addEventListener('click', () => goTo(el.dataset.view));
+  });
+
+  // ---------- Accessibility panel ----------
+  const accessPanel = document.getElementById('accessPanel');
+  document.getElementById('btn-access').addEventListener('click', () => {
+    accessPanel.hidden = !accessPanel.hidden;
+  });
+
+  let fontSize = 16;
+  document.getElementById('fontPlus').addEventListener('click', () => {
+    fontSize = Math.min(20, fontSize + 1);
+    document.documentElement.style.setProperty('--font-size-base', fontSize + 'px');
+  });
+  document.getElementById('fontMinus').addEventListener('click', () => {
+    fontSize = Math.max(14, fontSize - 1);
+    document.documentElement.style.setProperty('--font-size-base', fontSize + 'px');
+  });
+
+  function wireToggle(id, cls, target){
+    const btn = document.getElementById(id);
+    btn.addEventListener('click', () => {
+      const pressed = btn.getAttribute('aria-pressed') === 'true';
+      btn.setAttribute('aria-pressed', String(!pressed));
+      target.classList.toggle(cls, !pressed);
+    });
+  }
+  wireToggle('toggleContrast', 'contrast-high', document.body);
+  wireToggle('toggleTheme', 'theme-light', document.body);
+
+  const motionBtn = document.getElementById('toggleMotion');
+  motionBtn.addEventListener('click', () => {
+    const pressed = motionBtn.getAttribute('aria-pressed') === 'true';
+    motionBtn.setAttribute('aria-pressed', String(!pressed));
+    document.documentElement.style.setProperty('--motion', pressed ? '1' : '0');
+  });
+
+  document.getElementById('fileUpload').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const avatar = document.getElementById('avatarInitial');
+      avatar.style.backgroundImage = `url(${ev.target.result})`;
+      avatar.style.backgroundSize = 'cover';
+      avatar.style.backgroundPosition = 'center';
+      avatar.textContent = '';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // ---------- Stato ----------
+  let currentUser = null;   // { id, email }
+  let currentProfile = null; // { username, is_admin }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------- Catalogo (giochi / app / news) ----------
+  const CATEGORY_LABELS = { game: 'GIOCO', app: 'APP', news: 'NEWS' };
+  const DOWNLOADABLE_CATEGORIES = ['game', 'app']; // le news si leggono, non si scaricano
+
+  async function getAllItems(){
+    const { data, error } = await supabase.from('games').select('*').order('created_at');
+    if(error){ console.error(error); return []; }
+    return data;
+  }
+
+  function publicFileUrl(path){
+    if(!path) return null;
+    const { data } = supabase.storage.from('game-files').getPublicUrl(path);
+    return data.publicUrl;
+  }
+
+  async function getLibraryIds(){
+    if(!currentUser) return [];
+    const { data, error } = await supabase.from('downloads').select('game_id').eq('user_id', currentUser.id);
+    if(error){ console.error(error); return []; }
+    return data.map(r => r.game_id);
+  }
+
+  async function renderHomeCounts(items){
+    document.getElementById('countGame').textContent = items.filter(i => i.category === 'game').length + ' titoli';
+    document.getElementById('countApp').textContent = items.filter(i => i.category === 'app').length + ' strumenti';
+    document.getElementById('countNews').textContent = items.filter(i => i.category === 'news').length + ' novità';
+  }
+
+  async function renderCategory(category, items, library){
+    const list = document.getElementById('itemList-' + category);
+    if(!list) return;
+    const filtered = items.filter(i => i.category === category);
+    if(filtered.length === 0){
+      list.innerHTML = '<p class="empty-hint">Niente qui per ora. Torna presto!</p>';
+      return;
+    }
+    const downloadable = DOWNLOADABLE_CATEGORIES.includes(category);
+    list.innerHTML = filtered.map(item => `
+      <article class="item-card ${category}">
+        <span class="item-tag">${escapeHtml(item.tag || CATEGORY_LABELS[category])}</span>
+        <h4>${escapeHtml(item.title)}</h4>
+        <p>${escapeHtml(item.description || '')}</p>
+        ${downloadable ? `
+          <button class="download-btn ${library.includes(item.id) ? 'owned' : ''}" data-item-id="${item.id}" data-file="${item.file_path || ''}">
+            <i class="fa-solid ${library.includes(item.id) ? 'fa-check' : (item.file_path ? 'fa-download' : 'fa-bookmark')}"></i>
+            ${library.includes(item.id) ? 'Nella libreria' : (item.file_path ? 'Scarica' : 'Aggiungi alla libreria')}
+          </button>` : ''}
+      </article>
+    `).join('');
+
+    list.querySelectorAll('.download-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(!currentUser){
+          alert('Accedi dal tuo Profilo per scaricare i contenuti.');
+          goTo('user');
+          return;
+        }
+        const id = btn.dataset.itemId;
+        const filePath = btn.dataset.file;
+        const owned = btn.classList.contains('owned');
+        if(!owned){
+          await supabase.from('downloads').upsert({ user_id: currentUser.id, game_id: id });
+          if(filePath){
+            const url = publicFileUrl(filePath);
+            if(url) window.open(url, '_blank');
+          }
+        }else{
+          await supabase.from('downloads').delete().eq('user_id', currentUser.id).eq('game_id', id);
+        }
+        renderAllCategories();
+      });
+    });
+  }
+
+  async function renderAllCategories(){
+    const [items, library] = await Promise.all([getAllItems(), getLibraryIds()]);
+    renderHomeCounts(items);
+    renderCategory('game', items, library);
+    renderCategory('app', items, library);
+    renderCategory('news', items, library);
+    renderLibrary(items, library);
+  }
+
+  async function renderLibrary(itemsParam, libraryParam){
+    const box = document.getElementById('libraryList');
+    if(!currentUser){
+      box.innerHTML = '<p class="empty-hint">Accedi per vedere i contenuti che hai scaricato.</p>';
+      return;
+    }
+    const items = itemsParam || await getAllItems();
+    const ids = libraryParam || await getLibraryIds();
+    const owned = items.filter(i => ids.includes(i.id));
+    if(owned.length === 0){
+      box.innerHTML = '<p class="empty-hint">Non hai ancora scaricato nulla.</p>';
+      return;
+    }
+    box.innerHTML = owned.map(g => `
+      <div class="library-row">
+        <span>${escapeHtml(g.title)} <span style="color:var(--text-dim);font-size:.75rem;">· ${CATEGORY_LABELS[g.category] || ''}</span></span>
+        <button class="remove-link" data-remove-id="${g.id}">Rimuovi</button>
+      </div>
+    `).join('');
+    box.querySelectorAll('[data-remove-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await supabase.from('downloads').delete().eq('user_id', currentUser.id).eq('game_id', btn.dataset.removeId);
+        renderAllCategories();
+      });
+    });
+  }
+
+  // ---------- Autenticazione vera (Supabase Auth) ----------
+  function showAuthError(msg){
+    const el = document.getElementById('authError');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  document.getElementById('loginBtn').addEventListener('click', async () => {
+    const email = document.getElementById('emailInput').value.trim();
+    const password = document.getElementById('passwordInput').value;
+    if(!email || !password) return showAuthError('Inserisci email e password.');
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if(error) showAuthError(error.message);
+  });
+
+  document.getElementById('signupBtn').addEventListener('click', async () => {
+    const email = document.getElementById('emailInput').value.trim();
+    const password = document.getElementById('passwordInput').value;
+    if(!email || !password) return showAuthError('Inserisci email e password.');
+    if(password.length < 6) return showAuthError('La password deve avere almeno 6 caratteri.');
+    const { error } = await supabase.auth.signUp({ email, password });
+    if(error) return showAuthError(error.message);
+    showAuthError('Account creato! Controlla la mail se ti viene chiesta conferma, poi accedi.');
+  });
+
+  document.getElementById('btn-logout').addEventListener('click', async () => {
+    await supabase.auth.signOut();
+  });
+
+  async function refreshSessionUI(){
+    const { data: { user } } = await supabase.auth.getUser();
+    const gate = document.getElementById('loginGate');
+    const logged = document.getElementById('profileLogged');
+
+    if(user){
+      currentUser = user;
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      currentProfile = profile;
+      gate.hidden = true;
+      logged.hidden = false;
+      document.getElementById('profileName').textContent = (profile && profile.username) || user.email;
+      document.getElementById('profileEmail').textContent = user.email + (profile && profile.is_admin ? ' · admin' : '');
+      document.getElementById('avatarInitial').textContent = ((profile && profile.username) || user.email).charAt(0).toUpperCase();
+      document.getElementById('devTrigger').style.display = (profile && profile.is_admin) ? 'flex' : 'none';
+    }else{
+      currentUser = null;
+      currentProfile = null;
+      gate.hidden = false;
+      logged.hidden = true;
+      document.getElementById('devTrigger').style.display = 'none';
+    }
+    renderAllCategories();
+  }
+
+  supabase.auth.onAuthStateChange(() => refreshSessionUI());
+
+  // ---------- Pannello sviluppatore (visibile solo agli admin) ----------
+  const adminModal = document.getElementById('adminModal');
+  document.getElementById('devTrigger').style.display = 'none';
+  document.getElementById('devTrigger').addEventListener('click', () => {
+    if(!currentProfile || !currentProfile.is_admin){
+      alert('Solo gli amministratori possono gestire il catalogo.');
+      return;
+    }
+    adminModal.hidden = false;
+    renderAdminList();
+  });
+  document.getElementById('closeAdmin').addEventListener('click', () => adminModal.hidden = true);
+
+  async function renderAdminList(){
+    const box = document.getElementById('adminGamesList');
+    box.innerHTML = '<p class="empty-hint">Carico…</p>';
+    const games = await getAllItems();
+    if(games.length === 0){
+      box.innerHTML = '<p class="empty-hint">Nessun contenuto ancora. Aggiungine uno dal form qui sopra.</p>';
+      return;
+    }
+    box.innerHTML = games.map(g => `
+      <div class="admin-list-row">
+        <div>
+          <strong>${escapeHtml(g.title)}</strong> <span style="color:var(--text-dim);font-size:.75rem;">· ${CATEGORY_LABELS[g.category] || ''}</span>
+          <p>${escapeHtml(g.tag || '')} — ${escapeHtml(g.description || '')} ${g.file_path ? '· file caricato' : '· nessun file'}</p>
+        </div>
+        <button class="remove-link" data-admin-delete="${g.id}">Elimina</button>
+      </div>
+    `).join('');
+    box.querySelectorAll('[data-admin-delete]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await supabase.from('games').delete().eq('id', btn.dataset.adminDelete);
+        renderAdminList();
+        renderAllCategories();
+      });
+    });
+  }
+
+  document.getElementById('addGameBtn').addEventListener('click', async () => {
+    const title = document.getElementById('gameTitleInput').value.trim();
+    const tag = document.getElementById('gameTagInput').value.trim();
+    const description = document.getElementById('gameDescInput').value.trim();
+    const fileInput = document.getElementById('gameFileInput');
+    const file = fileInput.files[0];
+    const category = document.getElementById('gameCategoryInput').value;
+    if(!title){ alert('Serve almeno un titolo.'); return; }
+
+    const btn = document.getElementById('addGameBtn');
+    btn.disabled = true; btn.textContent = 'Salvo…';
+    try{
+      let filePath = null;
+      if(file){
+        const path = `${Date.now()}_${file.name}`;
+        const { error: uploadError } = await supabase.storage.from('game-files').upload(path, file);
+        if(uploadError) throw uploadError;
+        filePath = path;
+      }
+      const { error } = await supabase.from('games').insert({ title, tag, description, category, file_path: filePath });
+      if(error) throw error;
+
+      document.getElementById('gameTitleInput').value = '';
+      document.getElementById('gameTagInput').value = '';
+      document.getElementById('gameDescInput').value = '';
+      fileInput.value = '';
+      renderAdminList();
+      renderAllCategories();
+    }catch(e){
+      alert('Errore nel salvataggio: ' + (e.message || e));
+    }finally{
+      btn.disabled = false; btn.textContent = 'Aggiungi gioco';
+    }
+  });
+
+  // ---------- Avvio ----------
+  goTo('home');
+  refreshSessionUI();
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {/* ok se non disponibile, es. in anteprima locale */});
+    });
+  }
+})();
+</script>
+</body>
+</html>
