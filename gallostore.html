@@ -701,6 +701,9 @@
     <textarea class="text-input" id="gameDescInput" placeholder="Breve descrizione del gioco"></textarea>
     <label class="field-label" for="gameFileInput">File del gioco (opzionale — .zip, .exe, ecc.)</label>
     <input class="text-input" type="file" id="gameFileInput">
+    <p class="empty-hint" style="margin:-4px 0 10px;">oppure, invece di un file:</p>
+    <label class="field-label" for="gameLinkInput">Link esterno (es. GitHub Pages, Releases)</label>
+    <input class="text-input" id="gameLinkInput" type="url" placeholder="https://tuonome.github.io/repo/">
     <button class="primary-btn" id="addGameBtn">Aggiungi gioco</button>
     <h3 style="margin-top:22px;">Giochi nel catalogo</h3>
     <div id="adminGamesList"><p class="empty-hint">Carico…</p></div>
@@ -835,18 +838,22 @@
       return;
     }
     const downloadable = DOWNLOADABLE_CATEGORIES.includes(category);
-    list.innerHTML = filtered.map(item => `
+    list.innerHTML = filtered.map(item => {
+      const hasLink = !!(item.file_path || item.external_url);
+      const label = library.includes(item.id) ? 'Nella libreria' : (item.external_url && !item.file_path ? 'Apri' : (item.file_path ? 'Scarica' : 'Aggiungi alla libreria'));
+      const icon = library.includes(item.id) ? 'fa-check' : (item.external_url && !item.file_path ? 'fa-arrow-up-right-from-square' : (item.file_path ? 'fa-download' : 'fa-bookmark'));
+      return `
       <article class="item-card ${category}">
         <span class="item-tag">${escapeHtml(item.tag || CATEGORY_LABELS[category])}</span>
         <h4>${escapeHtml(item.title)}</h4>
         <p>${escapeHtml(item.description || '')}</p>
         ${downloadable ? `
-          <button class="download-btn ${library.includes(item.id) ? 'owned' : ''}" data-item-id="${item.id}" data-file="${item.file_path || ''}">
-            <i class="fa-solid ${library.includes(item.id) ? 'fa-check' : (item.file_path ? 'fa-download' : 'fa-bookmark')}"></i>
-            ${library.includes(item.id) ? 'Nella libreria' : (item.file_path ? 'Scarica' : 'Aggiungi alla libreria')}
+          <button class="download-btn ${library.includes(item.id) ? 'owned' : ''}" data-item-id="${item.id}" data-file="${item.file_path || ''}" data-link="${item.external_url || ''}">
+            <i class="fa-solid ${icon}"></i>
+            ${label}
           </button>` : ''}
-      </article>
-    `).join('');
+      </article>`;
+    }).join('');
 
     list.querySelectorAll('.download-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -857,12 +864,15 @@
         }
         const id = btn.dataset.itemId;
         const filePath = btn.dataset.file;
+        const externalUrl = btn.dataset.link;
         const owned = btn.classList.contains('owned');
         if(!owned){
           await supabase.from('downloads').upsert({ user_id: currentUser.id, game_id: id });
           if(filePath){
             const url = publicFileUrl(filePath);
             if(url) window.open(url, '_blank');
+          }else if(externalUrl){
+            window.open(externalUrl, '_blank');
           }
         }else{
           await supabase.from('downloads').delete().eq('user_id', currentUser.id).eq('game_id', id);
@@ -989,7 +999,7 @@
       <div class="admin-list-row">
         <div>
           <strong>${escapeHtml(g.title)}</strong> <span style="color:var(--text-dim);font-size:.75rem;">· ${CATEGORY_LABELS[g.category] || ''}</span>
-          <p>${escapeHtml(g.tag || '')} — ${escapeHtml(g.description || '')} ${g.file_path ? '· file caricato' : '· nessun file'}</p>
+          <p>${escapeHtml(g.tag || '')} — ${escapeHtml(g.description || '')} ${g.file_path ? '· file caricato' : (g.external_url ? '· link esterno' : '· nessun file/link')}</p>
         </div>
         <button class="remove-link" data-admin-delete="${g.id}">Elimina</button>
       </div>
@@ -1009,6 +1019,7 @@
     const description = document.getElementById('gameDescInput').value.trim();
     const fileInput = document.getElementById('gameFileInput');
     const file = fileInput.files[0];
+    const externalUrl = document.getElementById('gameLinkInput').value.trim();
     const category = document.getElementById('gameCategoryInput').value;
     if(!title){ alert('Serve almeno un titolo.'); return; }
 
@@ -1022,12 +1033,17 @@
         if(uploadError) throw uploadError;
         filePath = path;
       }
-      const { error } = await supabase.from('games').insert({ title, tag, description, category, file_path: filePath });
+      const { error } = await supabase.from('games').insert({
+        title, tag, description, category,
+        file_path: filePath,
+        external_url: externalUrl || null
+      });
       if(error) throw error;
 
       document.getElementById('gameTitleInput').value = '';
       document.getElementById('gameTagInput').value = '';
       document.getElementById('gameDescInput').value = '';
+      document.getElementById('gameLinkInput').value = '';
       fileInput.value = '';
       renderAdminList();
       renderAllCategories();
