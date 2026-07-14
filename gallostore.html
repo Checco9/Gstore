@@ -260,6 +260,15 @@
     display:flex;
     flex-direction:column;
     gap:8px;
+    overflow:hidden;
+  }
+  .item-cover{
+    width:calc(100% + 36px);
+    margin:-18px -18px 2px -18px;
+    height:130px;
+    object-fit:cover;
+    display:block;
+    background:var(--bg);
   }
   .item-tag{
     align-self:flex-start;
@@ -492,6 +501,47 @@
   .admin-list-row p{ margin:2px 0 0; font-size:.78rem; color:var(--text-dim); }
   textarea.text-input{ resize:vertical; min-height:64px; font-family:inherit; }
 
+  /* ---------- DETTAGLIO / RECENSIONI ---------- */
+  .item-card{ cursor:pointer; transition:transform .15s ease, border-color .15s ease; }
+  .item-card:hover{ transform:translateY(-2px); border-color:var(--panel-border); }
+  .item-card .download-btn{ cursor:default; }
+  .detail-cover{
+    width:calc(100% + 44px);
+    margin:-22px -22px 14px -22px;
+    height:180px;
+    object-fit:cover;
+  }
+  .avg-rating{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:.85rem;
+    color:var(--text-dim);
+    margin:2px 0 16px;
+  }
+  .avg-rating .stars{ color:#f2b23c; letter-spacing:1px; }
+  .stars-picker{ display:flex; gap:4px; margin:6px 0 10px; }
+  .stars-picker button{
+    background:none; border:none; cursor:pointer;
+    font-size:1.3rem; color:var(--panel-border); padding:0; line-height:1;
+  }
+  .stars-picker button.active{ color:#f2b23c; }
+  .review-item{
+    padding:12px 0;
+    border-bottom:1px solid var(--panel-border);
+  }
+  .review-item:last-child{ border-bottom:none; }
+  .review-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-size:.82rem;
+    margin-bottom:4px;
+  }
+  .review-head .stars{ color:#f2b23c; letter-spacing:1px; font-size:.8rem; }
+  .review-item p{ margin:0; font-size:.85rem; color:var(--text-dim); }
+  .review-author{ font-weight:600; color:var(--text); }
+
   /* ---------- MOBILE ---------- */
   .mobile-toggle{ display:none; }
   @media (max-width: 760px){
@@ -628,7 +678,7 @@
               <li><button id="btn-access"><i class="fa-solid fa-universal-access"></i> Accessibilità</button></li>
               <li><button id="btn-logout" class="danger"><i class="fa-solid fa-right-from-bracket"></i> Esci</button></li>
             </ul>
-            <label class="avatar-upload">Cambia immagine profilo (anteprima locale)
+            <label class="avatar-upload"><span id="avatarUploadLabel">Cambia immagine profilo</span>
               <input type="file" id="fileUpload" accept="image/*">
             </label>
           </div>
@@ -708,6 +758,8 @@
     <input class="text-input" id="gameTagInput" placeholder="es. AVVENTURA">
     <label class="field-label" for="gameDescInput">Descrizione</label>
     <textarea class="text-input" id="gameDescInput" placeholder="Breve descrizione del gioco"></textarea>
+    <label class="field-label" for="gameCoverInput">Immagine di copertina (opzionale)</label>
+    <input class="text-input" type="file" id="gameCoverInput" accept="image/*">
     <label class="field-label" for="gameFileInput">File del gioco (opzionale — .zip, .exe, ecc.)</label>
     <input class="text-input" type="file" id="gameFileInput">
     <p class="empty-hint" style="margin:-4px 0 10px;">oppure, invece di un file:</p>
@@ -716,6 +768,38 @@
     <button class="primary-btn" id="addGameBtn">Aggiungi gioco</button>
     <h3 style="margin-top:22px;">Giochi nel catalogo</h3>
     <div id="adminGamesList"><p class="empty-hint">Carico…</p></div>
+  </div>
+</div>
+
+<!-- DETAIL / REVIEWS MODAL -->
+<div class="modal-overlay" id="detailModal" hidden>
+  <div class="modal-box">
+    <button class="modal-close" id="closeDetail" aria-label="Chiudi">✕</button>
+    <img class="detail-cover" id="detailCover" style="display:none;" alt="">
+    <span class="item-tag" id="detailTag"></span>
+    <h3 id="detailTitle" style="margin:8px 0 4px;"></h3>
+    <p class="empty-hint" id="detailDescription" style="margin-bottom:6px;"></p>
+    <div class="avg-rating" id="detailAvgRating"></div>
+
+    <h3 style="margin-top:10px;">La tua recensione</h3>
+    <div id="detailYourReviewLoggedOut" class="empty-hint" hidden>Accedi per lasciare una recensione.</div>
+    <div id="detailYourReviewForm" hidden>
+      <div class="stars-picker" id="detailStarsPicker">
+        <button type="button" data-star="1">★</button>
+        <button type="button" data-star="2">★</button>
+        <button type="button" data-star="3">★</button>
+        <button type="button" data-star="4">★</button>
+        <button type="button" data-star="5">★</button>
+      </div>
+      <textarea class="text-input" id="detailCommentInput" placeholder="Cosa ne pensi? (opzionale)"></textarea>
+      <div style="display:flex; gap:8px;">
+        <button class="primary-btn" id="detailSubmitReview">Pubblica recensione</button>
+        <button class="ghost-btn" id="detailDeleteReview" hidden>Elimina</button>
+      </div>
+    </div>
+
+    <h3 style="margin-top:22px;">Recensioni <span id="detailReviewCount" style="color:var(--text-dim);font-weight:400;"></span></h3>
+    <div id="detailReviewsList"><p class="empty-hint">Carico…</p></div>
   </div>
 </div>
 
@@ -787,18 +871,24 @@
     document.documentElement.style.setProperty('--motion', pressed ? '1' : '0');
   });
 
-  document.getElementById('fileUpload').addEventListener('change', (e) => {
+  document.getElementById('fileUpload').addEventListener('change', async (e) => {
     const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const avatar = document.getElementById('avatarInitial');
-      avatar.style.backgroundImage = `url(${ev.target.result})`;
-      avatar.style.backgroundSize = 'cover';
-      avatar.style.backgroundPosition = 'center';
-      avatar.textContent = '';
-    };
-    reader.readAsDataURL(file);
+    if(!file || !currentUser) return;
+    const label = document.getElementById('avatarUploadLabel');
+    const originalText = label.textContent;
+    label.textContent = 'Carico…';
+    try{
+      const compressed = await compressImage(file, 400, 0.85);
+      const path = `${currentUser.id}/avatar.jpg`;
+      const { error } = await supabase.storage.from('avatars').upload(path, compressed, { upsert: true, contentType: 'image/jpeg' });
+      if(error) throw error;
+      tryLoadAvatar(currentUser.id);
+    }catch(err){
+      alert('Errore nel caricamento della foto: ' + (err.message || err));
+    }finally{
+      label.textContent = originalText;
+      e.target.value = '';
+    }
   });
 
   // ---------- Stato ----------
@@ -807,6 +897,54 @@
 
   function escapeHtml(str){
     return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // Ridimensiona e comprime un'immagine nel browser prima di caricarla,
+  // così anche una foto pesante diventa un file leggero (poche decine di KB).
+  function compressImage(file, maxDim, quality){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          let { width, height } = img;
+          if(width > height && width > maxDim){ height = Math.round(height * maxDim / width); width = maxDim; }
+          else if(height >= width && height > maxDim){ width = Math.round(width * maxDim / height); height = maxDim; }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Compressione fallita')), 'image/jpeg', quality);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function coverPublicUrl(path){
+    if(!path) return null;
+    const { data } = supabase.storage.from('covers').getPublicUrl(path);
+    return data.publicUrl;
+  }
+
+  function avatarPublicUrl(userId){
+    const { data } = supabase.storage.from('avatars').getPublicUrl(`${userId}/avatar.jpg`);
+    return data.publicUrl;
+  }
+
+  function tryLoadAvatar(userId){
+    const avatar = document.getElementById('avatarInitial');
+    const testImg = new Image();
+    testImg.onload = () => {
+      avatar.style.backgroundImage = `url(${avatarPublicUrl(userId)}?t=${Date.now()})`;
+      avatar.style.backgroundSize = 'cover';
+      avatar.style.backgroundPosition = 'center';
+      avatar.textContent = '';
+    };
+    testImg.onerror = () => { /* nessun avatar caricato ancora, resta l'iniziale */ };
+    testImg.src = `${avatarPublicUrl(userId)}?t=${Date.now()}`;
   }
 
   // ---------- Catalogo (giochi / app / news) ----------
@@ -862,7 +1000,8 @@
       const label = library.includes(item.id) ? 'Nella libreria' : (item.external_url && !item.file_path ? 'Apri' : (item.file_path ? 'Scarica' : 'Aggiungi alla libreria'));
       const icon = library.includes(item.id) ? 'fa-check' : (item.external_url && !item.file_path ? 'fa-arrow-up-right-from-square' : (item.file_path ? 'fa-download' : 'fa-bookmark'));
       return `
-      <article class="item-card ${category}">
+      <article class="item-card ${category}" data-detail-id="${item.id}">
+        ${item.cover_path ? `<img class="item-cover" src="${coverPublicUrl(item.cover_path)}" alt="">` : ''}
         <span class="item-tag">${escapeHtml(item.tag || CATEGORY_LABELS[category])}</span>
         <h4>${escapeHtml(item.title)}</h4>
         <p>${escapeHtml(item.description || '')}</p>
@@ -934,7 +1073,8 @@
       return;
     }
     list.innerHTML = matches.map(item => `
-      <article class="item-card ${item.category}">
+      <article class="item-card ${item.category}" data-detail-id="${item.id}">
+        ${item.cover_path ? `<img class="item-cover" src="${coverPublicUrl(item.cover_path)}" alt="">` : ''}
         <span class="item-tag">${escapeHtml(item.tag || CATEGORY_LABELS[item.category])} · ${CATEGORY_LABELS[item.category]}</span>
         <h4>${escapeHtml(item.title)}</h4>
         <p>${escapeHtml(item.description || '')}</p>
@@ -1051,8 +1191,10 @@
       logged.hidden = false;
       document.getElementById('profileName').textContent = (profile && profile.username) || user.email;
       document.getElementById('profileEmail').textContent = user.email + (profile && profile.is_admin ? ' · admin' : '');
+      document.getElementById('avatarInitial').style.backgroundImage = '';
       document.getElementById('avatarInitial').textContent = ((profile && profile.username) || user.email).charAt(0).toUpperCase();
       document.getElementById('devTrigger').style.display = (profile && profile.is_admin) ? 'flex' : 'none';
+      tryLoadAvatar(user.id);
     }else{
       currentUser = null;
       currentProfile = null;
@@ -1110,6 +1252,8 @@
     const description = document.getElementById('gameDescInput').value.trim();
     const fileInput = document.getElementById('gameFileInput');
     const file = fileInput.files[0];
+    const coverInput = document.getElementById('gameCoverInput');
+    const coverFile = coverInput.files[0];
     const externalUrl = document.getElementById('gameLinkInput').value.trim();
     const category = document.getElementById('gameCategoryInput').value;
     if(!title){ alert('Serve almeno un titolo.'); return; }
@@ -1124,10 +1268,18 @@
         if(uploadError) throw uploadError;
         filePath = path;
       }
+      let coverPath = null;
+      if(coverFile){
+        const compressed = await compressImage(coverFile, 700, 0.82);
+        coverPath = `${Date.now()}_cover.jpg`;
+        const { error: coverError } = await supabase.storage.from('covers').upload(coverPath, compressed, { contentType: 'image/jpeg' });
+        if(coverError) throw coverError;
+      }
       const { error } = await supabase.from('games').insert({
         title, tag, description, category,
         file_path: filePath,
-        external_url: externalUrl || null
+        external_url: externalUrl || null,
+        cover_path: coverPath
       });
       if(error) throw error;
 
@@ -1136,6 +1288,7 @@
       document.getElementById('gameDescInput').value = '';
       document.getElementById('gameLinkInput').value = '';
       fileInput.value = '';
+      coverInput.value = '';
       renderAdminList();
       renderAllCategories();
     }catch(e){
@@ -1143,6 +1296,142 @@
     }finally{
       btn.disabled = false; btn.textContent = 'Aggiungi gioco';
     }
+  });
+
+  // ---------- Dettaglio contenuto + recensioni ----------
+  let detailItem = null;
+  let selectedStars = 0;
+
+  function findItemById(id){
+    return itemsCache.find(i => i.id === id);
+  }
+
+  document.addEventListener('click', (e) => {
+    const card = e.target.closest('.item-card[data-detail-id]');
+    if(!card || e.target.closest('.download-btn')) return;
+    const item = findItemById(card.dataset.detailId);
+    if(item) openDetail(item);
+  });
+
+  async function openDetail(item){
+    detailItem = item;
+    const modal = document.getElementById('detailModal');
+    const cover = document.getElementById('detailCover');
+    if(item.cover_path){
+      cover.src = coverPublicUrl(item.cover_path);
+      cover.style.display = 'block';
+    }else{
+      cover.style.display = 'none';
+    }
+    document.getElementById('detailTag').textContent = item.tag || CATEGORY_LABELS[item.category];
+    document.getElementById('detailTitle').textContent = item.title;
+    document.getElementById('detailDescription').textContent = item.description || '';
+    modal.hidden = false;
+    await loadReviews();
+  }
+
+  document.getElementById('closeDetail').addEventListener('click', () => {
+    document.getElementById('detailModal').hidden = true;
+  });
+
+  function starString(n){
+    return '★'.repeat(n) + '☆'.repeat(5 - n);
+  }
+
+  async function loadReviews(){
+    const listBox = document.getElementById('detailReviewsList');
+    listBox.innerHTML = '<p class="empty-hint">Carico…</p>';
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('*, profiles(username)')
+      .eq('game_id', detailItem.id)
+      .order('created_at', { ascending: false });
+
+    if(error){
+      listBox.innerHTML = '<p class="empty-hint">Impossibile caricare le recensioni.</p>';
+      return;
+    }
+
+    const count = data.length;
+    document.getElementById('detailReviewCount').textContent = count ? `(${count})` : '';
+    const avgBox = document.getElementById('detailAvgRating');
+    if(count === 0){
+      avgBox.innerHTML = '<span>Ancora nessuna recensione</span>';
+    }else{
+      const avg = data.reduce((s, r) => s + r.rating, 0) / count;
+      avgBox.innerHTML = `<span class="stars">${starString(Math.round(avg))}</span><span>${avg.toFixed(1)} su 5 · ${count} ${count === 1 ? 'recensione' : 'recensioni'}</span>`;
+    }
+
+    if(count === 0){
+      listBox.innerHTML = '<p class="empty-hint">Sii il primo a lasciare una recensione.</p>';
+    }else{
+      listBox.innerHTML = data.map(r => `
+        <div class="review-item">
+          <div class="review-head">
+            <span class="review-author">${escapeHtml((r.profiles && r.profiles.username) || 'Utente')}</span>
+            <span class="stars">${starString(r.rating)}</span>
+          </div>
+          ${r.comment ? `<p>${escapeHtml(r.comment)}</p>` : ''}
+        </div>
+      `).join('');
+    }
+
+    // Form "la tua recensione"
+    const loggedOutBox = document.getElementById('detailYourReviewLoggedOut');
+    const formBox = document.getElementById('detailYourReviewForm');
+    if(!currentUser){
+      loggedOutBox.hidden = false;
+      formBox.hidden = true;
+      return;
+    }
+    loggedOutBox.hidden = true;
+    formBox.hidden = false;
+
+    const mine = data.find(r => r.user_id === currentUser.id);
+    selectedStars = mine ? mine.rating : 0;
+    setStarsPicker(selectedStars);
+    document.getElementById('detailCommentInput').value = mine ? (mine.comment || '') : '';
+    document.getElementById('detailSubmitReview').textContent = mine ? 'Aggiorna recensione' : 'Pubblica recensione';
+    document.getElementById('detailDeleteReview').hidden = !mine;
+  }
+
+  function setStarsPicker(n){
+    selectedStars = n;
+    document.querySelectorAll('#detailStarsPicker button').forEach(btn => {
+      btn.classList.toggle('active', Number(btn.dataset.star) <= n);
+    });
+  }
+
+  document.querySelectorAll('#detailStarsPicker button').forEach(btn => {
+    btn.addEventListener('click', () => setStarsPicker(Number(btn.dataset.star)));
+  });
+
+  document.getElementById('detailSubmitReview').addEventListener('click', async () => {
+    if(!currentUser || !detailItem) return;
+    if(selectedStars < 1){ alert('Seleziona almeno una stella.'); return; }
+    const comment = document.getElementById('detailCommentInput').value.trim();
+    const btn = document.getElementById('detailSubmitReview');
+    btn.disabled = true;
+    try{
+      const { error } = await supabase.from('reviews').upsert({
+        game_id: detailItem.id,
+        user_id: currentUser.id,
+        rating: selectedStars,
+        comment: comment || null
+      }, { onConflict: 'game_id,user_id' });
+      if(error) throw error;
+      await loadReviews();
+    }catch(e){
+      alert('Errore nel salvataggio della recensione: ' + (e.message || e));
+    }finally{
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('detailDeleteReview').addEventListener('click', async () => {
+    if(!currentUser || !detailItem) return;
+    await supabase.from('reviews').delete().eq('game_id', detailItem.id).eq('user_id', currentUser.id);
+    await loadReviews();
   });
 
   // ---------- Avvio ----------
