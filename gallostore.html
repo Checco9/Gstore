@@ -537,7 +537,7 @@
     <div class="topbar">
       <div class="search">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" placeholder="Cerca giochi, app, news…" aria-label="Cerca">
+        <input type="text" id="searchInput" placeholder="Cerca giochi, app, news…" aria-label="Cerca">
       </div>
       <button class="dev-trigger" id="devTrigger" title="Modalità sviluppatore" aria-label="Modalità sviluppatore"><i class="fa-solid fa-code"></i></button>
     </div>
@@ -803,6 +803,9 @@
   // ---------- Catalogo (giochi / app / news) ----------
   const CATEGORY_LABELS = { game: 'GIOCO', app: 'APP', news: 'NEWS' };
   const DOWNLOADABLE_CATEGORIES = ['game', 'app']; // le news si leggono, non si scaricano
+  let itemsCache = [];
+  let libraryCache = [];
+  let searchTerm = '';
 
   async function getAllItems(){
     const { data, error } = await supabase.from('games').select('*').order('created_at');
@@ -832,9 +835,16 @@
   async function renderCategory(category, items, library){
     const list = document.getElementById('itemList-' + category);
     if(!list) return;
-    const filtered = items.filter(i => i.category === category);
+    let filtered = items.filter(i => i.category === category);
+    if(searchTerm){
+      filtered = filtered.filter(i =>
+        (i.title || '').toLowerCase().includes(searchTerm) ||
+        (i.description || '').toLowerCase().includes(searchTerm) ||
+        (i.tag || '').toLowerCase().includes(searchTerm)
+      );
+    }
     if(filtered.length === 0){
-      list.innerHTML = '<p class="empty-hint">Niente qui per ora. Torna presto!</p>';
+      list.innerHTML = `<p class="empty-hint">${searchTerm ? 'Nessun risultato per la ricerca in questa sezione.' : 'Niente qui per ora. Torna presto!'}</p>`;
       return;
     }
     const downloadable = DOWNLOADABLE_CATEGORIES.includes(category);
@@ -884,12 +894,25 @@
 
   async function renderAllCategories(){
     const [items, library] = await Promise.all([getAllItems(), getLibraryIds()]);
+    itemsCache = items;
+    libraryCache = library;
     renderHomeCounts(items);
     renderCategory('game', items, library);
     renderCategory('app', items, library);
     renderCategory('news', items, library);
     renderLibrary(items, library);
   }
+
+  function applySearchFilter(){
+    renderCategory('game', itemsCache, libraryCache);
+    renderCategory('app', itemsCache, libraryCache);
+    renderCategory('news', itemsCache, libraryCache);
+  }
+
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    searchTerm = e.target.value.trim().toLowerCase();
+    applySearchFilter();
+  });
 
   async function renderLibrary(itemsParam, libraryParam){
     const box = document.getElementById('libraryList');
@@ -904,12 +927,29 @@
       box.innerHTML = '<p class="empty-hint">Non hai ancora scaricato nulla.</p>';
       return;
     }
-    box.innerHTML = owned.map(g => `
+    box.innerHTML = owned.map(g => {
+      const hasLink = !!(g.file_path || g.external_url);
+      return `
       <div class="library-row">
         <span>${escapeHtml(g.title)} <span style="color:var(--text-dim);font-size:.75rem;">· ${CATEGORY_LABELS[g.category] || ''}</span></span>
-        <button class="remove-link" data-remove-id="${g.id}">Rimuovi</button>
-      </div>
-    `).join('');
+        <div style="display:flex; gap:8px; align-items:center;">
+          ${hasLink ? `<button class="ghost-btn" data-open-id="${g.id}" data-file="${g.file_path || ''}" data-link="${g.external_url || ''}">Apri</button>` : ''}
+          <button class="remove-link" data-remove-id="${g.id}">Rimuovi</button>
+        </div>
+      </div>`;
+    }).join('');
+    box.querySelectorAll('[data-open-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const filePath = btn.dataset.file;
+        const externalUrl = btn.dataset.link;
+        if(filePath){
+          const url = publicFileUrl(filePath);
+          if(url) window.open(url, '_blank');
+        }else if(externalUrl){
+          window.open(externalUrl, '_blank');
+        }
+      });
+    });
     box.querySelectorAll('[data-remove-id]').forEach(btn => {
       btn.addEventListener('click', async () => {
         await supabase.from('downloads').delete().eq('user_id', currentUser.id).eq('game_id', btn.dataset.removeId);
