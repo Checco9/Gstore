@@ -679,6 +679,15 @@
         </div>
       </div>
     </section>
+
+    <!-- SEARCH RESULTS -->
+    <section class="view" id="view-search">
+      <div class="hub-header">
+        <button class="back-btn" id="closeSearch" aria-label="Chiudi ricerca"><i class="fa-solid fa-arrow-left"></i></button>
+        <h2 id="searchResultsTitle">Risultati</h2>
+      </div>
+      <div class="card-grid" id="itemList-search"></div>
+    </section>
   </main>
 </div>
 
@@ -907,11 +916,53 @@
     renderCategory('game', itemsCache, libraryCache);
     renderCategory('app', itemsCache, libraryCache);
     renderCategory('news', itemsCache, libraryCache);
+    if(searchTerm){
+      renderSearchResults();
+    }
   }
 
+  function renderSearchResults(){
+    const list = document.getElementById('itemList-search');
+    document.getElementById('searchResultsTitle').textContent = `Risultati per "${searchTerm}"`;
+    const matches = itemsCache.filter(i =>
+      (i.title || '').toLowerCase().includes(searchTerm) ||
+      (i.description || '').toLowerCase().includes(searchTerm) ||
+      (i.tag || '').toLowerCase().includes(searchTerm)
+    );
+    if(matches.length === 0){
+      list.innerHTML = '<p class="empty-hint">Nessun risultato. Prova un altro termine.</p>';
+      return;
+    }
+    list.innerHTML = matches.map(item => `
+      <article class="item-card ${item.category}">
+        <span class="item-tag">${escapeHtml(item.tag || CATEGORY_LABELS[item.category])} · ${CATEGORY_LABELS[item.category]}</span>
+        <h4>${escapeHtml(item.title)}</h4>
+        <p>${escapeHtml(item.description || '')}</p>
+      </article>
+    `).join('');
+  }
+
+  let lastViewBeforeSearch = 'home';
   document.getElementById('searchInput').addEventListener('input', (e) => {
     searchTerm = e.target.value.trim().toLowerCase();
     applySearchFilter();
+    const searchView = document.getElementById('view-search');
+    if(searchTerm){
+      if(!searchView.classList.contains('active')){
+        const current = document.querySelector('.view.active');
+        if(current && current.id !== 'view-search') lastViewBeforeSearch = current.id.replace('view-', '');
+      }
+      views.forEach(v => v.classList.toggle('active', v.id === 'view-search'));
+      glow.style.background = accentMap.home;
+    }else{
+      goTo(lastViewBeforeSearch);
+    }
+  });
+
+  document.getElementById('closeSearch').addEventListener('click', () => {
+    document.getElementById('searchInput').value = '';
+    searchTerm = '';
+    goTo(lastViewBeforeSearch);
   });
 
   async function renderLibrary(itemsParam, libraryParam){
