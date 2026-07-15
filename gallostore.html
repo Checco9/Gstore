@@ -1056,11 +1056,6 @@
           goTo('user');
           return;
         }
-        if(!isConfirmed()){
-          alert("Devi confermare la tua email prima di scaricare o aprire contenuti. Controlla la posta, oppure vai al tuo Profilo per rinviare l'email di conferma.");
-          goTo('user');
-          return;
-        }
         const id = btn.dataset.itemId;
         const filePath = btn.dataset.file;
         const externalUrl = btn.dataset.link;
@@ -1172,10 +1167,6 @@
     }).join('');
     box.querySelectorAll('[data-open-id]').forEach(btn => {
       btn.addEventListener('click', () => {
-        if(!isConfirmed()){
-          alert("Devi confermare la tua email prima di aprire contenuti. Controlla la posta, oppure vai al tuo Profilo per rinviare l'email di conferma.");
-          return;
-        }
         const filePath = btn.dataset.file;
         const externalUrl = btn.dataset.link;
         if(filePath){
@@ -1219,7 +1210,7 @@
       options: { emailRedirectTo: window.location.origin + window.location.pathname }
     });
     if(error) return showAuthError(error.message);
-    showAuthError('Account creato! Controlla la mail se ti viene chiesta conferma, poi accedi.');
+    showAuthError('Account creato! Ora puoi accedere.');
   });
 
   document.getElementById('btn-logout').addEventListener('click', async () => {
@@ -1283,7 +1274,7 @@
       document.getElementById('avatarInitial').textContent = ((profile && profile.username) || user.email).charAt(0).toUpperCase();
       document.getElementById('devTrigger').style.display = (profile && profile.is_admin) ? 'flex' : 'none';
       tryLoadAvatar(user.id);
-      document.getElementById('unconfirmedBanner').hidden = isConfirmed();
+      document.getElementById('unconfirmedBanner').hidden = true;
     }else{
       currentUser = null;
       currentProfile = null;
