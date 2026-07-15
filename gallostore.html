@@ -540,6 +540,25 @@
   }
   .review-head .stars{ color:#f2b23c; letter-spacing:1px; font-size:.8rem; }
   .review-item p{ margin:0; font-size:.85rem; color:var(--text-dim); }
+  .review-who{ display:flex; align-items:center; gap:8px; }
+  .review-avatar-wrap{
+    width:24px; height:24px;
+    border-radius:50%;
+    overflow:hidden;
+    position:relative;
+    flex-shrink:0;
+  }
+  .review-avatar{ width:100%; height:100%; object-fit:cover; display:block; }
+  .review-avatar-fallback{
+    width:100%; height:100%;
+    position:absolute; top:0; left:0;
+    display:none;
+    align-items:center; justify-content:center;
+    background:linear-gradient(135deg, var(--accent-user), var(--accent-game));
+    color:#fff;
+    font-size:.65rem;
+    font-family:'Space Grotesk', sans-serif;
+  }
   .review-author{ font-weight:600; color:var(--text); }
 
   /* ---------- MOBILE ---------- */
@@ -674,7 +693,20 @@
             <div class="avatar" id="avatarInitial">F</div>
             <h3 id="profileName">—</h3>
             <p id="profileEmail">—</p>
+
+            <div id="usernameEditBox" hidden style="margin-bottom:10px;">
+              <input class="text-input" id="newUsernameInput" placeholder="Nuovo nome utente" maxlength="24">
+              <button class="primary-btn" id="saveUsernameBtn" style="margin-bottom:8px;">Salva</button>
+            </div>
+
+            <div id="unconfirmedBanner" class="settings-card" hidden style="border-color:var(--accent-news); padding:14px; margin-bottom:14px;">
+              <strong style="font-size:.88rem;">Email non confermata</strong>
+              <p class="empty-hint" style="margin:4px 0 10px;">Conferma la tua email per poter scaricare o aprire contenuti.</p>
+              <button class="ghost-btn" id="resendConfirmBtn">Invia di nuovo l'email</button>
+            </div>
+
             <ul class="menu-list">
+              <li><button id="btn-edit-username"><i class="fa-solid fa-pen"></i> Cambia nome utente</button></li>
               <li><button id="btn-access"><i class="fa-solid fa-universal-access"></i> Accessibilità</button></li>
               <li><button id="btn-logout" class="danger"><i class="fa-solid fa-right-from-bracket"></i> Esci</button></li>
             </ul>
@@ -895,6 +927,10 @@
   let currentUser = null;   // { id, email }
   let currentProfile = null; // { username, is_admin }
 
+  function isConfirmed(){
+    return !!(currentUser && currentUser.email_confirmed_at);
+  }
+
   function escapeHtml(str){
     return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
@@ -1020,6 +1056,11 @@
           goTo('user');
           return;
         }
+        if(!isConfirmed()){
+          alert("Devi confermare la tua email prima di scaricare o aprire contenuti. Controlla la posta, oppure vai al tuo Profilo per rinviare l'email di conferma.");
+          goTo('user');
+          return;
+        }
         const id = btn.dataset.itemId;
         const filePath = btn.dataset.file;
         const externalUrl = btn.dataset.link;
@@ -1131,6 +1172,10 @@
     }).join('');
     box.querySelectorAll('[data-open-id]').forEach(btn => {
       btn.addEventListener('click', () => {
+        if(!isConfirmed()){
+          alert("Devi confermare la tua email prima di aprire contenuti. Controlla la posta, oppure vai al tuo Profilo per rinviare l'email di conferma.");
+          return;
+        }
         const filePath = btn.dataset.file;
         const externalUrl = btn.dataset.link;
         if(filePath){
@@ -1178,6 +1223,46 @@
     await supabase.auth.signOut();
   });
 
+  document.getElementById('resendConfirmBtn').addEventListener('click', async () => {
+    if(!currentUser) return;
+    const btn = document.getElementById('resendConfirmBtn');
+    btn.disabled = true; btn.textContent = 'Invio…';
+    try{
+      const { error } = await supabase.auth.resend({ type: 'signup', email: currentUser.email });
+      if(error) throw error;
+      alert('Email inviata di nuovo. Controlla anche lo spam.');
+    }catch(e){
+      alert('Errore: ' + (e.message || e));
+    }finally{
+      btn.disabled = false; btn.textContent = "Invia di nuovo l'email";
+    }
+  });
+
+  // ---------- Cambio nome utente ----------
+  document.getElementById('btn-edit-username').addEventListener('click', () => {
+    const box = document.getElementById('usernameEditBox');
+    document.getElementById('newUsernameInput').value = (currentProfile && currentProfile.username) || '';
+    box.hidden = !box.hidden;
+  });
+
+  document.getElementById('saveUsernameBtn').addEventListener('click', async () => {
+    if(!currentUser) return;
+    const newName = document.getElementById('newUsernameInput').value.trim();
+    if(!newName){ alert('Inserisci un nome valido.'); return; }
+    const btn = document.getElementById('saveUsernameBtn');
+    btn.disabled = true; btn.textContent = 'Salvo…';
+    try{
+      const { error } = await supabase.from('profiles').update({ username: newName }).eq('id', currentUser.id);
+      if(error) throw error;
+      document.getElementById('usernameEditBox').hidden = true;
+      await refreshSessionUI();
+    }catch(e){
+      alert('Errore nel salvataggio: ' + (e.message || e));
+    }finally{
+      btn.disabled = false; btn.textContent = 'Salva';
+    }
+  });
+
   async function refreshSessionUI(){
     const { data: { user } } = await supabase.auth.getUser();
     const gate = document.getElementById('loginGate');
@@ -1195,6 +1280,7 @@
       document.getElementById('avatarInitial').textContent = ((profile && profile.username) || user.email).charAt(0).toUpperCase();
       document.getElementById('devTrigger').style.display = (profile && profile.is_admin) ? 'flex' : 'none';
       tryLoadAvatar(user.id);
+      document.getElementById('unconfirmedBanner').hidden = isConfirmed();
     }else{
       currentUser = null;
       currentProfile = null;
@@ -1365,15 +1451,24 @@
     if(count === 0){
       listBox.innerHTML = '<p class="empty-hint">Sii il primo a lasciare una recensione.</p>';
     }else{
-      listBox.innerHTML = data.map(r => `
+      listBox.innerHTML = data.map(r => {
+        const name = (r.profiles && r.profiles.username) || 'Utente';
+        return `
         <div class="review-item">
           <div class="review-head">
-            <span class="review-author">${escapeHtml((r.profiles && r.profiles.username) || 'Utente')}</span>
+            <span class="review-who">
+              <span class="review-avatar-wrap">
+                <img class="review-avatar" src="${avatarPublicUrl(r.user_id)}" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <span class="review-avatar-fallback">${escapeHtml(name.charAt(0).toUpperCase())}</span>
+              </span>
+              <span class="review-author">${escapeHtml(name)}</span>
+            </span>
             <span class="stars">${starString(r.rating)}</span>
           </div>
           ${r.comment ? `<p>${escapeHtml(r.comment)}</p>` : ''}
         </div>
-      `).join('');
+      `;
+      }).join('');
     }
 
     // Form "la tua recensione"
