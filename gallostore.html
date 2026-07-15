@@ -1214,7 +1214,10 @@
     const password = document.getElementById('passwordInput').value;
     if(!email || !password) return showAuthError('Inserisci email e password.');
     if(password.length < 6) return showAuthError('La password deve avere almeno 6 caratteri.');
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({
+      email, password,
+      options: { emailRedirectTo: window.location.origin + window.location.pathname }
+    });
     if(error) return showAuthError(error.message);
     showAuthError('Account creato! Controlla la mail se ti viene chiesta conferma, poi accedi.');
   });
